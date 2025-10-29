@@ -684,3 +684,92 @@
   width: auto;
   margin: 0;
 }
+/* ===== PRICING BREAKDOWN STYLES ===== */
+/* Add these styles at the end of your existing App.css */
+
+.price-section {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  border-left: 4px solid #007bff;
+}
+
+.price-section h4 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+  font-size: 1.3em;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 10px;
+}
+
+.price-breakdown {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 15px;
+  border-bottom: 1px solid #e0e0e0;
+  background: white;
+  align-items: center;
+}
+
+.price-row:last-child {
+  border-bottom: none;
+}
+
+.price-row.subtotal {
+  background: #f8f9fa;
+  border-top: 2px solid #dee2e6;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.price-row.grand-total {
+  background: #007bff;
+  color: white;
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+/* Responsive design for pricing */
+@media (max-width: 768px) {
+  .price-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  
+  .price-row span:last-child {
+    align-self: flex-end;
+    font-weight: bold;
+  }
+  
+  .price-section {
+    padding: 15px;
+  }
+}
+
+/* Print styles for pricing */
+@media print {
+  .price-section {
+    background: white !important;
+    border-left: 4px solid #000 !important;
+  }
+  
+  .price-breakdown {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+  
+  .price-row.grand-total {
+    background: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
