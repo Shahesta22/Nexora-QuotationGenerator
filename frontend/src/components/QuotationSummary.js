@@ -108,190 +108,388 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
     setLoading(false);
   };
 
-  const downloadPDF = (quotationData = quotation) => {
-    if (!quotationData) {
-      alert('No quotation data available to download');
-      return;
-    }
+const downloadPDF = async (quotationData = quotation) => {
+  if (!quotationData) {
+    alert('No quotation data available to download');
+    return;
+  }
 
-    try {
-      const doc = new jsPDF();
+  try {
+    const doc = new jsPDF();
+    
+    // Set margins and column positions with proper spacing
+    const margin = 15;
+    const pageWidth = 210;
+    const col1 = margin; // S.No. (5px)
+    const col2 = margin + 8; // Description (85px)
+    const col3 = margin + 98; // Unit (12px)
+    const col4 = margin + 115; // Qty (12px)
+    const col5 = margin + 132; // Price (18px)
+    const col6 = margin + 155; // Amount (25px)
+    
+    const descriptionWidth = 85;
+    
+    let yPosition = margin;
+    
+    // Function to check if new page needed
+    const checkNewPage = (spaceNeeded = 10) => {
+      if (yPosition + spaceNeeded > 270) {
+        doc.addPage();
+        yPosition = margin;
+        addHeader();
+        return true;
+      }
+      return false;
+    };
+
+    // Function to add header with logo
+    const addHeader = async () => {
+      // Blue header background
+      doc.setFillColor(41, 128, 185);
+      doc.rect(0, 0, pageWidth, 25, 'F');
       
-      // Set margins and initial position
-      const margin = 20;
-      let yPosition = margin;
+      try {
+        // Add logo from Google Drive - Replace with your actual Google Drive image URL
+        // Make sure the image is publicly accessible
+        const logoUrl = 'https://drive.google.com/file/d/1kLhj9AcNzMjvD5_Qd5_luQUoCQkIeguo/view?usp=drive_link';
+        
+        // Add logo (centered, 30x30 mm)
+        const logoWidth = 30;
+        const logoHeight = 30;
+        const logoX = (pageWidth - logoWidth) / 2;
+        const logoY = 5;
+        
+        // Add logo image
+        doc.addImage(logoUrl, 'PNG', logoX, logoY, logoWidth, logoHeight);
+        
+        // Company name below logo
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('NEXORA GROUP', pageWidth / 2, logoY + logoHeight + 5, { align: 'center' });
+        
+        // Tagline
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Sports Infrastructure Solutions', pageWidth / 2, logoY + logoHeight + 9, { align: 'center' });
+        
+      } catch (logoError) {
+        console.warn('Logo could not be loaded, using text-only header:', logoError);
+        
+        // Fallback: Text-only header if logo fails to load
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('NEXORA GROUP', pageWidth / 2, 12, { align: 'center' });
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Sports Infrastructure Solutions', pageWidth / 2, 17, { align: 'center' });
+      }
       
-      // Add company header with background
-      doc.setFillColor(44, 62, 80);
-      doc.rect(0, 0, 210, 50, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
-      doc.setFont('helvetica', 'bold');
-      doc.text('NEXORA GROUP', 105, 20, { align: 'center' });
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Sports Infrastructure Solutions', 105, 30, { align: 'center' });
+      // Contact info on right side
+      doc.setFontSize(7);
+      doc.text('+91-8431322728', pageWidth - margin, 10, { align: 'right' });
+      doc.text('info.nexoragroup@gmail.com', pageWidth - margin, 14, { align: 'right' });
+      doc.text('www.nexoragroup.com', pageWidth - margin, 18, { align: 'right' });
       
-      // Quotation title and number
-      yPosition = 70;
       doc.setTextColor(0, 0, 0);
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('CONSTRUCTION QUOTATION', 105, yPosition, { align: 'center' });
-      
-      yPosition += 15;
-      doc.setFontSize(14);
-      doc.text(`Quotation #: ${quotationData.quotationNumber}`, margin, yPosition);
-      
-      yPosition += 8;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Date: ${new Date(quotationData.createdAt).toLocaleDateString('en-IN')}`, margin, yPosition);
-      
-      // Client information section
-      yPosition += 20;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('CLIENT INFORMATION', margin, yPosition);
-      
-      yPosition += 8;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Name: ${quotationData.clientInfo?.name || 'N/A'}`, margin, yPosition);
-      
-      yPosition += 6;
-      doc.text(`Email: ${quotationData.clientInfo?.email || 'N/A'}`, margin, yPosition);
-      
-      yPosition += 6;
-      doc.text(`Phone: ${quotationData.clientInfo?.phone || 'N/A'}`, margin, yPosition);
-      
-      yPosition += 6;
-      const addressLines = doc.splitTextToSize(`Address: ${quotationData.clientInfo?.address || 'N/A'}`, 170);
-      doc.text(addressLines, margin, yPosition);
-      yPosition += (addressLines.length * 6);
-      
-      // Project details section - FIXED: Added safe access with optional chaining
-      yPosition += 10;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('PROJECT DETAILS', margin, yPosition);
-      
-      yPosition += 8;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      
-      // Safe access to projectInfo properties
-      const sport = quotationData.projectInfo?.sport || 'N/A';
-      const courtType = quotationData.projectInfo?.courtType || quotationData.projectInfo?.gameType || 'N/A';
-      const courtSize = quotationData.projectInfo?.courtSize || 'N/A';
-      const courtArea = quotationData.requirements?.base?.area || 'N/A';
-      
-      doc.text(`Sport: ${String(sport).replace(/-/g, ' ').toUpperCase()}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Facility Type: ${String(courtType).toUpperCase()}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Court Size: ${String(courtSize).toUpperCase()}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Court Area: ${courtArea} sq. meters`, margin, yPosition);
-      
-      // Cost breakdown section
-      yPosition += 15;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('COST BREAKDOWN', margin, yPosition);
-      
-      yPosition += 10;
-      
-      // Create cost table with safe access
-      const costs = [
-        ['Item', 'Amount (₹)'],
-        ['Base Construction', (quotationData.pricing?.baseCost || 0).toLocaleString('en-IN')],
-        ['Flooring', (quotationData.pricing?.flooringCost || 0).toLocaleString('en-IN')],
-        ['Equipment', (quotationData.pricing?.equipmentCost || 0).toLocaleString('en-IN')],
-      ];
+      yPosition = 40; // Increased to accommodate larger header
+    };
 
-      // Add optional costs if they exist
-      if (quotationData.pricing?.lightingCost > 0) {
-        costs.push(['Lighting System', (quotationData.pricing.lightingCost || 0).toLocaleString('en-IN')]);
-      }
+    // Add first page header
+    await addHeader();
+
+    // Quotation title and details
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('QUOTATION FOR SPORTS COURT CONSTRUCTION', pageWidth/2, yPosition, { align: 'center' });
+    
+    yPosition += 8;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Ref. No: NXG/${new Date().getFullYear()}/${Math.random().toString(36).substr(2, 6).toUpperCase()}`, margin, yPosition);
+    doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`, pageWidth - margin, yPosition, { align: 'right' });
+    
+    // Client information
+    yPosition += 12;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CLIENT DETAILS:', margin, yPosition);
+    yPosition += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Name: ${quotationData.clientInfo?.name || 'N/A'}`, margin, yPosition);
+    yPosition += 4;
+    doc.text(`Email: ${quotationData.clientInfo?.email || 'N/A'}`, margin, yPosition);
+    yPosition += 4;
+    doc.text(`Phone: ${quotationData.clientInfo?.phone || 'N/A'}`, margin, yPosition);
+    yPosition += 4;
+    const addressLines = doc.splitTextToSize(`Address: ${quotationData.clientInfo?.address || 'N/A'}`, 150);
+    doc.text(addressLines, margin, yPosition);
+    yPosition += (addressLines.length * 4) + 8;
+
+    // ... rest of your existing PDF content (project details, cost breakdown, etc.)
+    // Project Description Header
+    checkNewPage(15);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PROPOSAL DETAILS', margin, yPosition);
+    yPosition += 6;
+    
+    const sport = quotationData.projectInfo?.sport || 'Multi-Sport';
+    const courtType = quotationData.projectInfo?.courtType || quotationData.projectInfo?.gameType || 'Standard';
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Proposal for ${sport.replace(/-/g, ' ').toUpperCase()} ${courtType.toUpperCase()}`, margin, yPosition);
+    yPosition += 10;
+
+    // Cost Breakdown Table Header
+    checkNewPage(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    
+    // Draw table header with background
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPosition-4, pageWidth - (2*margin), 8, 'F');
+    
+    // Header texts with proper alignment
+    doc.text('S.No.', col1, yPosition);
+    doc.text('Description', col2, yPosition);
+    doc.text('Unit', col3, yPosition, { align: 'center' });
+    doc.text('Qty', col4, yPosition, { align: 'center' });
+    doc.text('Price', col5, yPosition, { align: 'center' });
+    doc.text('Amount', col6, yPosition, { align: 'right' });
+    
+    yPosition += 4;
+    doc.line(margin, yPosition, pageWidth - margin, yPosition);
+    yPosition += 6;
+
+    // Calculate areas and quantities
+    const baseArea = quotationData.requirements?.base?.area || 1000;
+    const shedArea = Math.round(baseArea * 1.2);
+    const flooringArea = baseArea;
+    const lightCount = quotationData.requirements?.lighting?.count || 6;
+    const netCount = sport.toLowerCase().includes('badminton') ? 1 : 2;
+
+    // Function to add item with proper formatting
+    const addItem = (itemNumber, title, unit, qty, price, descriptionLines) => {
+      checkNewPage(20);
       
-      if (quotationData.pricing?.roofCost > 0) {
-        costs.push(['Roof/Cover', (quotationData.pricing.roofCost || 0).toLocaleString('en-IN')]);
-      }
-      
-      if (quotationData.pricing?.additionalCost > 0) {
-        costs.push(['Additional Features', (quotationData.pricing.additionalCost || 0).toLocaleString('en-IN')]);
-      }
-      
-      const totalCost = quotationData.pricing?.totalCost || 0;
-      costs.push(['TOTAL', totalCost.toLocaleString('en-IN')]);
-      
-      // Draw table
-      costs.forEach(([item, amount], index) => {
-        const isHeader = index === 0;
-        const isTotal = index === costs.length - 1;
-        
-        if (isHeader) {
-          doc.setFillColor(240, 240, 240);
-          doc.rect(margin, yPosition, 170, 8, 'F');
-          doc.setFont('helvetica', 'bold');
-        } else if (isTotal) {
-          doc.setFillColor(240, 240, 240);
-          doc.rect(margin, yPosition, 170, 8, 'F');
-          doc.setFont('helvetica', 'bold');
-        } else {
-          doc.setFont('helvetica', 'normal');
-        }
-        
-        doc.text(item, margin + 2, yPosition + 6);
-        doc.text(amount, margin + 150, yPosition + 6, { align: 'right' });
-        
-        yPosition += 8;
-      });
-      
-      // Terms and conditions
-      yPosition += 15;
-      doc.setFontSize(10);
+      // Item header row with proper alignment
       doc.setFont('helvetica', 'bold');
-      doc.text('TERMS & CONDITIONS:', margin, yPosition);
+      doc.setFontSize(9);
+      doc.text(itemNumber, col1, yPosition);
+      doc.text(title, col2, yPosition);
+      doc.text(unit, col3, yPosition, { align: 'center' });
+      doc.text(qty.toString(), col4, yPosition, { align: 'center' });
+      doc.text(price, col5, yPosition, { align: 'center' });
       
-      yPosition += 6;
+      // Calculate amount
+      const amount = parseInt(qty) * parseInt(price.replace(/[^0-9]/g, ''));
+      doc.text(amount.toLocaleString('en-IN') + '.00', col6, yPosition, { align: 'right' });
+      
+      yPosition += 4;
+      
+      // Description text
       doc.setFont('helvetica', 'normal');
-      const terms = [
-        '• This quotation is valid for 30 days from the date of issue',
-        '• Prices are subject to change without prior notice',
-        '• 50% advance payment required to commence work',
-        '• All materials carry manufacturer warranty',
-        '• Workmanship guaranteed for 1 year'
-      ];
+      doc.setFontSize(7);
       
-      terms.forEach(term => {
-        if (yPosition > 250) {
-          doc.addPage();
-          yPosition = margin;
-        }
-        doc.text(term, margin + 5, yPosition);
-        yPosition += 5;
+      descriptionLines.forEach(line => {
+        checkNewPage(3);
+        const wrappedLines = doc.splitTextToSize(line, descriptionWidth);
+        wrappedLines.forEach(wrappedLine => {
+          checkNewPage(3);
+          doc.text(wrappedLine, col2, yPosition);
+          yPosition += 3;
+        });
       });
       
-      // Company footer
-      doc.setFillColor(44, 62, 80);
-      doc.rect(0, 270, 210, 30, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.text('NEXORA GROUP - Sports Infrastructure Solutions', 105, 277, { align: 'center' });
-      doc.text('Jalahalli West, Bangalore-560015', 105, 283, { align: 'center' });
-      doc.text('📞 +91 8431322728 | 📧 info.nexoragroup@gmail.com', 105, 289, { align: 'center' });
+      yPosition += 5;
+      doc.line(col2, yPosition, pageWidth - margin, yPosition);
+      yPosition += 8;
       
-      // Save the PDF
-      doc.save(`Nexora_Quotation_${quotationData.quotationNumber}.pdf`);
-      
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Error generating PDF. Please try again.');
+      return amount;
+    };
+
+    // Item 1: Base Construction
+    const baseAmount = addItem(
+      '1.', 
+      'BASE CONSTRUCTION', 
+      'Sft', 
+      baseArea, 
+      '110/-',
+      [
+        'Excavation work in surface excavation not exceeding 30cm depth.',
+        'Disposal of excavated earth up to 50m as directed.',
+        'Sub Grade preparation with power road roller 8-12 tonne.',
+        'WBM - Stone aggregate with 100mm thickness.',
+        'PCC flooring M-10 to M15 with 75mm thickness.'
+      ]
+    );
+
+    // Item 2: Shed Structure (only if roof required)
+    let shedAmount = 0;
+    if (quotationData.requirements?.roof?.required) {
+      shedAmount = addItem(
+        '2.', 
+        'INDOOR SHED STRUCTURE', 
+        'Sft', 
+        shedArea, 
+        '350/-',
+        [
+          'Roof shed: centre 35ft, sides 30ft height.',
+          'Steel: Truss 2"x2" 2mm, Pillar 8"x3" 3mm.',
+          'Purlin: 2"x2" 2mm Square Pipe.',
+          'Base: 10mm, J Bolt 16mm, Sheet 0.45mm.',
+          'Painting: primer + enamel coat.'
+        ]
+      );
     }
-  };
+
+    // Item 3: Flooring System
+    const flooringAmount = addItem(
+      quotationData.requirements?.roof?.required ? '3.' : '2.', 
+      'ACRYLIC FLOORING', 
+      'Sft', 
+      flooringArea, 
+      '65/-',
+      [
+        '8-Layer ITF approved acrylic system.',
+        'Layers: Primer, Resurfacer, Unirubber.',
+        'Precoat, Topcoat for protection.',
+        'High performance gameplay surface.',
+        'Make: UNICA/PRIOR/TOP FLOOR.'
+      ]
+    );
+
+    // Item 4: Lighting System (only if required)
+    let lightingAmount = 0;
+    if (quotationData.requirements?.lighting?.required) {
+      const lightItemNumber = quotationData.requirements?.roof?.required ? '4.' : '3.';
+      lightingAmount = addItem(
+        lightItemNumber, 
+        'LED FLOOD LIGHTS', 
+        'Nos', 
+        lightCount, 
+        '11,500/-',
+        [
+          '150-200W LED Sports Flood Lights.',
+          'OSRAM make, 2 years warranty.',
+          'High lumen output for sports.',
+          'Weatherproof construction.'
+        ]
+      );
+    }
+
+    // Item 5: Nets & Posts
+    let netItemNumber;
+    if (quotationData.requirements?.roof?.required) {
+      netItemNumber = quotationData.requirements?.lighting?.required ? '5.' : '4.';
+    } else {
+      netItemNumber = quotationData.requirements?.lighting?.required ? '4.' : '3.';
+    }
+    
+    const netAmount = addItem(
+      netItemNumber, 
+      'POST & NET SYSTEM', 
+      'Set', 
+      netCount, 
+      '15,000/-',
+      [
+        `${sport.toUpperCase()} Standard System.`,
+        'Adjustable height mechanism.',
+        'Galvanized steel posts.',
+        'Competition standard net.'
+      ]
+    );
+
+    // Total Calculation - FIXED ALIGNMENT
+    checkNewPage(25);
+    
+    const subtotal = baseAmount + shedAmount + flooringAmount + lightingAmount + netAmount;
+    const gst = Math.round(subtotal * 0.18);
+    const grandTotal = subtotal + gst;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    
+    // Draw total line
+    doc.line(col5, yPosition, col6 + 10, yPosition);
+    yPosition += 6;
+    
+    // Total row - PROPERLY ALIGNED
+    doc.text('Total', col3, yPosition);
+    doc.text(subtotal.toLocaleString('en-IN') + '.00', col6, yPosition, { align: 'right' });
+    
+    yPosition += 7;
+    doc.text('GST@18%', col3, yPosition);
+    doc.text(gst.toLocaleString('en-IN') + '.00', col6, yPosition, { align: 'right' });
+    
+    yPosition += 7;
+    doc.line(col5, yPosition, col6 + 10, yPosition);
+    yPosition += 7;
+    
+    doc.text('Grand Total', col3, yPosition);
+    doc.text(grandTotal.toLocaleString('en-IN') + '.00', col6, yPosition, { align: 'right' });
+    
+    yPosition += 15;
+
+    // Terms and Conditions
+    checkNewPage(30);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TERMS & CONDITIONS:', margin, yPosition);
+    
+    yPosition += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    const terms = [
+      '• Payment: 50% Advance, 30% after frame, 20% on completion',
+      '• Validity: 10 days from date of issue',
+      '• Completion: 35 days (excluding weather delays)',
+      '• Transportation charges included',
+      '• Materials: Manufacturer warranty',
+      '• Workmanship: 1 year guarantee'
+    ];
+    
+    terms.forEach(term => {
+      checkNewPage(4);
+      doc.text(term, margin, yPosition);
+      yPosition += 4;
+    });
+
+    // Footer on each page
+    const addFooter = () => {
+      const pageHeight = doc.internal.pageSize.height;
+      doc.setFillColor(41, 128, 185);
+      doc.rect(0, pageHeight - 15, pageWidth, 15, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text('NEXORA GROUP - Sports Infrastructure Solutions | Jalahalli West, Bangalore-560015', 
+               pageWidth/2, pageHeight - 10, { align: 'center' });
+      doc.text('+91 8431322728 | info.nexoragroup@gmail.com | www.nexoragroup.com', 
+               pageWidth/2, pageHeight - 5, { align: 'center' });
+    };
+
+    // Add footer and page numbers to all pages
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      addFooter();
+      // Add page numbers
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(8);
+      doc.text(`Page ${i} of ${totalPages}`, pageWidth/2, doc.internal.pageSize.height - 20, { align: 'center' });
+    }
+
+    // Save the PDF
+    doc.save(`Nexora_Quotation_${new Date().getTime()}.pdf`);
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Error generating PDF. Please try again.');
+  }
+};
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -339,60 +537,11 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
           <div className="section">
             <h4>Project Details</h4>
             <div className="info-grid">
-              {/* FIXED: Safe access with optional chaining */}
               <div><strong>Sport:</strong> {String(quotation.projectInfo?.sport || 'N/A').replace(/-/g, ' ').toUpperCase()}</div>
               <div><strong>Facility Type:</strong> {String(quotation.projectInfo?.courtType || quotation.projectInfo?.gameType || 'N/A').toUpperCase()}</div>
               <div><strong>Court Size:</strong> {String(quotation.projectInfo?.courtSize || 'N/A').toUpperCase()}</div>
               <div><strong>Court Area:</strong> {quotation.requirements?.base?.area || 'N/A'} sq. meters</div>
             </div>
-          </div>
-
-          <div className="section">
-            <h4>Cost Breakdown</h4>
-            <table className="cost-table">
-              <tbody>
-                <tr>
-                  <td>Base Construction</td>
-                  <td>{formatCurrency(quotation.pricing?.baseCost)}</td>
-                </tr>
-                <tr>
-                  <td>Flooring</td>
-                  <td>{formatCurrency(quotation.pricing?.flooringCost)}</td>
-                </tr>
-                <tr>
-                  <td>Equipment</td>
-                  <td>{formatCurrency(quotation.pricing?.equipmentCost)}</td>
-                </tr>
-                {(quotation.pricing?.lightingCost || 0) > 0 && (
-                  <tr>
-                    <td>Lighting System</td>
-                    <td>{formatCurrency(quotation.pricing?.lightingCost)}</td>
-                  </tr>
-                )}
-                {(quotation.pricing?.roofCost || 0) > 0 && (
-                  <tr>
-                    <td>Roof/Cover</td>
-                    <td>{formatCurrency(quotation.pricing?.roofCost)}</td>
-                  </tr>
-                )}
-                {(quotation.pricing?.additionalCost || 0) > 0 && (
-                  <tr>
-                    <td>Additional Features</td>
-                    <td>{formatCurrency(quotation.pricing?.additionalCost)}</td>
-                  </tr>
-                )}
-                <tr className="total-row">
-                  <td><strong>Total Cost</strong></td>
-                  <td><strong>{formatCurrency(quotation.pricing?.totalCost)}</strong></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="section">
-            <h4>Validity & Terms</h4>
-            <p>This quotation is valid for 30 days from the date of issue.</p>
-            <p>All materials and workmanship are guaranteed as per NEXORA GROUP standards.</p>
           </div>
 
           <div className="button-group">
@@ -404,8 +553,8 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
 
         <div className="company-footer">
           <h3>NEXORA GROUP</h3>
-          <p>123 Sports Complex Road, Mumbai, Maharashtra - 400001</p>
-          <p>+91 98765 43210 | info@nexoragroup.com | www.nexoragroup.com</p>
+          <p>Jalahalli West, Bangalore-560015</p>
+          <p>+91 8431322728 | info.nexoragroup@gmail.com | www.nexoragroup.com</p>
         </div>
       </div>
     );
@@ -474,7 +623,6 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
       <div className="section">
         <h3>Project Summary</h3>
         <div className="summary-details">
-          {/* FIXED: Safe access with optional chaining */}
           <p><strong>Sport:</strong> {String(formData.projectInfo?.sport || 'Not selected').replace(/-/g, ' ').toUpperCase()}</p>
           <p><strong>Facility Type:</strong> {String(formData.projectInfo?.courtType || formData.projectInfo?.gameType || 'Not selected').toUpperCase()}</p>
           <p><strong>Court Size:</strong> {String(formData.projectInfo?.courtSize || 'Not selected').toUpperCase()}</p>

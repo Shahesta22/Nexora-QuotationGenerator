@@ -8,10 +8,14 @@ const quotationSchema = new mongoose.Schema({
     address: { type: String, required: true }
   },
   projectInfo: {
-    gameType: { type: String, required: false }, // Make this optional for backward compatibility
-    courtType: { type: String, required: true }, // indoor/outdoor
-    courtSize: { type: String, required: true }, // standard/custom/premium
-    sport: { type: String, required: true }
+    // New fields
+    constructionType: { type: String, required: true },
+    sport: { type: String, required: true },
+    customArea: { type: Number, default: 0 },
+    // Old fields for backward compatibility
+    gameType: { type: String },
+    courtType: { type: String },
+    courtSize: { type: String }
   },
   requirements: {
     base: {
@@ -28,6 +32,30 @@ const quotationSchema = new mongoose.Schema({
       unitCost: Number,
       totalCost: Number
     }],
+    // New additional features structure
+    additionalFeatures: {
+      drainage: {
+        required: { type: Boolean, default: false },
+        type: { type: String },
+        area: { type: Number }
+      },
+      fencing: {
+        required: { type: Boolean, default: false },
+        type: { type: String },
+        length: { type: Number }
+      },
+      lighting: {
+        required: { type: Boolean, default: false },
+        type: { type: String },
+        quantity: { type: Number }
+      },
+      shed: {
+        required: { type: Boolean, default: false },
+        type: { type: String },
+        area: { type: Number }
+      }
+    },
+    // Old structure for backward compatibility
     lighting: {
       required: { type: Boolean, default: false },
       type: { type: String },
@@ -37,16 +65,17 @@ const quotationSchema = new mongoose.Schema({
       required: { type: Boolean, default: false },
       type: { type: String },
       area: { type: Number }
-    },
-    additionalFeatures: [{
-      name: String,
-      cost: Number
-    }]
+    }
   },
   pricing: {
     baseCost: { type: Number, required: true },
     flooringCost: { type: Number, required: true },
     equipmentCost: { type: Number, default: 0 },
+    // New costs
+    drainageCost: { type: Number, default: 0 },
+    fencingCost: { type: Number, default: 0 },
+    shedCost: { type: Number, default: 0 },
+    // Old costs for backward compatibility
     lightingCost: { type: Number, default: 0 },
     roofCost: { type: Number, default: 0 },
     additionalCost: { type: Number, default: 0 },

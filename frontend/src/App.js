@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './App.css';
-import GameSelection from './components/GameSelection';
-import CourtSize from './components/CourtSize';
+import ConstructionType from './components/ConstructionType';
+import SportSelection from './components/SportSelection';
 import Requirements from './components/Requirements';
 import QuotationSummary from './components/QuotationSummary';
 
@@ -27,7 +27,7 @@ function App() {
     switch (currentStep) {
       case 1:
         return (
-          <GameSelection
+          <ConstructionType
             data={formData.projectInfo}
             updateData={(data) => updateFormData('projectInfo', data)}
             nextStep={nextStep}
@@ -35,7 +35,7 @@ function App() {
         );
       case 2:
         return (
-          <CourtSize
+          <SportSelection
             data={formData.projectInfo}
             updateData={(data) => updateFormData('projectInfo', data)}
             nextStep={nextStep}
@@ -74,8 +74,8 @@ function App() {
         </div>
         <h2>Sports Ground Construction Quotation</h2>
         <div className="progress-bar">
-          <div className={`step ${currentStep >= 1 ? 'active' : ''}`}>Game Selection</div>
-          <div className={`step ${currentStep >= 2 ? 'active' : ''}`}>Court Size</div>
+          <div className={`step ${currentStep >= 1 ? 'active' : ''}`}>Construction Type</div>
+          <div className={`step ${currentStep >= 2 ? 'active' : ''}`}>Sport Selection</div>
           <div className={`step ${currentStep >= 3 ? 'active' : ''}`}>Requirements</div>
           <div className={`step ${currentStep >= 4 ? 'active' : ''}`}>Quotation</div>
         </div>

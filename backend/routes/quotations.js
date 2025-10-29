@@ -6,20 +6,16 @@ const Pricing = require('../models/Pricing');
 // Get sports configuration
 router.get('/sports-config', (req, res) => {
   const sportsConfig = {
-    outdoor: [
+    sports: [
       { id: 'basketball', name: 'Basketball Court', image: '🏀' },
-      { id: 'football', name: 'Football Field', image: '⚽' },
-      { id: 'volleyball', name: 'Volleyball Court', image: '🏐' },
       { id: 'badminton', name: 'Badminton Court', image: '🏸' },
+      { id: 'boxcricket', name: 'Box Cricket', image: '🏏' },
+      { id: 'football', name: 'Football Field', image: '⚽' },
+      { id: 'gymflooring', name: 'Gym Flooring', image: '💪' },
       { id: 'pickleball', name: 'Pickleball Court', image: '🎾' },
+      { id: 'running-track', name: 'Running Track', image: '🏃' },
       { id: 'tennis', name: 'Tennis Court', image: '🎾' },
-      { id: 'cricket', name: 'Cricket Ground', image: '🏏' }
-    ],
-    indoor: [
-      { id: 'table-tennis', name: 'Table Tennis', image: '🏓' },
-      { id: 'swimming', name: 'Swimming Pool', image: '🏊' },
-      { id: 'basketball-indoor', name: 'Basketball Court (Indoor)', image: '🏀' },
-      { id: 'badminton-indoor', name: 'Badminton Court (Indoor)', image: '🏸' }
+      { id: 'volleyball', name: 'Volleyball Court', image: '🏐' }
     ]
   };
   res.json(sportsConfig);
@@ -38,48 +34,40 @@ router.get('/equipment/:sport', async (req, res) => {
     const equipmentMap = {
       'basketball': [
         { id: 'basketball-hoop', name: 'Basketball Hoop System', quantity: 2 },
-        { id: 'basketball-backboard', name: 'Backboard', quantity: 2 }
-      ],
-      'football': [
-        { id: 'football-goalpost', name: 'Football Goalpost', quantity: 2 },
-        { id: 'football-net', name: 'Goal Net', quantity: 2 }
-      ],
-      'volleyball': [
-        { id: 'volleyball-posts', name: 'Volleyball Posts', quantity: 2 },
-        { id: 'volleyball-net', name: 'Volleyball Net', quantity: 1 }
+        { id: 'basketball-backboard', name: 'Backboard', quantity: 2 },
+        { id: 'basketball-poles', name: 'Basketball Poles', quantity: 2 }
       ],
       'badminton': [
         { id: 'badminton-posts', name: 'Badminton Posts', quantity: 2 },
         { id: 'badminton-net', name: 'Badminton Net', quantity: 1 }
       ],
+      'boxcricket': [
+        { id: 'cricket-net', name: 'Cricket Net', quantity: 1 },
+        { id: 'cricket-matting', name: 'Cricket Matting', quantity: 1 },
+        { id: 'cricket-stumps', name: 'Cricket Stumps', quantity: 3 }
+      ],
+      'football': [
+        { id: 'football-goalpost', name: 'Football Goalpost', quantity: 2 },
+        { id: 'football-net', name: 'Goal Net', quantity: 2 }
+      ],
+      'gymflooring': [
+        // Gym flooring typically doesn't have additional equipment
+      ],
       'pickleball': [
         { id: 'pickleball-net', name: 'Pickleball Net', quantity: 1 },
         { id: 'pickleball-posts', name: 'Pickleball Posts', quantity: 2 }
+      ],
+      'running-track': [
+        { id: 'track-lane-marking', name: 'Track Lane Marking', quantity: 1 },
+        { id: 'starting-blocks', name: 'Starting Blocks', quantity: 8 }
       ],
       'tennis': [
         { id: 'tennis-net', name: 'Tennis Net', quantity: 1 },
         { id: 'tennis-posts', name: 'Tennis Posts', quantity: 2 }
       ],
-      'cricket': [
-        { id: 'cricket-pitch', name: 'Cricket Pitch', quantity: 1 },
-        { id: 'cricket-sight-screen', name: 'Sight Screen', quantity: 2 }
-      ],
-      'table-tennis': [
-        { id: 'table-tennis-table', name: 'Table Tennis Table', quantity: 1 },
-        { id: 'table-tennis-net', name: 'Table Tennis Net', quantity: 1 }
-      ],
-      'swimming': [
-        { id: 'swimming-pool-liner', name: 'Pool Liner', quantity: 1 },
-        { id: 'filtration-system', name: 'Filtration System', quantity: 1 },
-        { id: 'pool-ladder', name: 'Pool Ladder', quantity: 2 }
-      ],
-      'basketball-indoor': [
-        { id: 'basketball-hoop', name: 'Basketball Hoop System', quantity: 2 },
-        { id: 'basketball-backboard', name: 'Backboard', quantity: 2 }
-      ],
-      'badminton-indoor': [
-        { id: 'badminton-posts', name: 'Badminton Posts', quantity: 2 },
-        { id: 'badminton-net', name: 'Badminton Net', quantity: 1 }
+      'volleyball': [
+        { id: 'volleyball-posts', name: 'Volleyball Posts', quantity: 2 },
+        { id: 'volleyball-net', name: 'Volleyball Net', quantity: 1 }
       ]
     };
 
@@ -112,71 +100,34 @@ router.post('/', async (req, res) => {
 
     const { clientInfo, projectInfo, requirements } = req.body;
     
-    // Detailed validation with specific messages
-    if (!clientInfo) {
-      console.log('Missing clientInfo');
-      return res.status(400).json({ message: 'Missing client information' });
-    }
-
-    if (!clientInfo.name || !clientInfo.email || !clientInfo.phone || !clientInfo.address) {
-      console.log('Incomplete clientInfo:', clientInfo);
+    // Enhanced validation for both old and new formats
+    if (!clientInfo || !clientInfo.name || !clientInfo.email || !clientInfo.phone || !clientInfo.address) {
       return res.status(400).json({ message: 'Please complete all client information fields' });
     }
 
-    if (!projectInfo) {
-      console.log('Missing projectInfo');
-      return res.status(400).json({ message: 'Missing project information' });
+    // Handle both old and new projectInfo formats
+    const constructionType = projectInfo?.constructionType || 'standard';
+    const sport = projectInfo?.sport || projectInfo?.gameType;
+    const courtSize = projectInfo?.courtSize || 'standard';
+    const customArea = projectInfo?.customArea || 0;
+
+    if (!sport) {
+      return res.status(400).json({ message: 'Sport selection is required' });
     }
 
-    // FIX: Accept both gameType (from frontend) and courtType (for schema)
-    const courtType = projectInfo.courtType || projectInfo.gameType;
-    
-    if (!projectInfo.sport || !courtType || !projectInfo.courtSize) {
-      console.log('Incomplete projectInfo:', projectInfo);
-      return res.status(400).json({ 
-        message: 'Please complete all project information fields',
-        details: {
-          sport: projectInfo.sport,
-          courtType: courtType,
-          courtSize: projectInfo.courtSize
-        }
-      });
-    }
-
-    if (!requirements) {
-      console.log('Missing requirements');
-      return res.status(400).json({ message: 'Missing construction requirements' });
-    }
-
-    if (!requirements.base || !requirements.flooring) {
-      console.log('Missing base or flooring:', requirements);
+    if (!requirements || !requirements.base || !requirements.flooring) {
       return res.status(400).json({ message: 'Please select base and flooring types' });
     }
 
-    if (!requirements.base.type || !requirements.flooring.type) {
-      console.log('Missing base or flooring type:', requirements);
-      return res.status(400).json({ message: 'Please select base and flooring types' });
+    // Calculate court area based on construction type
+    let courtArea;
+    if (constructionType === 'standard') {
+      courtArea = pricing.courtSizes[sport]?.standard || 100;
+    } else {
+      courtArea = customArea || 100;
     }
 
-    console.log('Validating base type:', requirements.base.type);
-    console.log('Available base types:', Object.keys(pricing.base));
-    console.log('Validating flooring type:', requirements.flooring.type);
-    console.log('Available flooring types:', Object.keys(pricing.flooring));
-
-    // Validate base and flooring types exist in pricing
-    if (!pricing.base[requirements.base.type]) {
-      console.log(`Invalid base type: ${requirements.base.type}`);
-      return res.status(400).json({ message: `Invalid base type selected. Please choose from available options.` });
-    }
-
-    if (!pricing.flooring[requirements.flooring.type]) {
-      console.log(`Invalid flooring type: ${requirements.flooring.type}`);
-      return res.status(400).json({ message: `Invalid flooring type selected. Please choose from available options.` });
-    }
-
-    // Get court area based on sport and size
-    const courtArea = pricing.courtSizes[projectInfo.sport]?.[projectInfo.courtSize] || 100;
-    console.log('Court area calculated:', courtArea, 'for sport:', projectInfo.sport, 'size:', projectInfo.courtSize);
+    console.log('Court area calculated:', courtArea, 'for sport:', sport, 'type:', constructionType);
 
     // Calculate costs
     const baseCost = Math.round((pricing.base[requirements.base.type] || 0) * courtArea);
@@ -184,51 +135,91 @@ router.post('/', async (req, res) => {
     
     // Equipment cost
     const equipmentCost = (requirements.equipment || []).reduce((total, item) => {
-      const itemCost = Number(item.totalCost) || 0;
-      console.log(`Equipment: ${item.name}, Cost: ${itemCost}`);
-      return total + itemCost;
+      return total + (Number(item.totalCost) || 0);
     }, 0);
     
-    // Lighting cost
+    // Handle both old and new additional features format
+    let drainageCost = 0;
+    let fencingCost = 0;
     let lightingCost = 0;
-    if (requirements.lighting && requirements.lighting.required && requirements.lighting.type) {
-      const lightingQuantity = Number(requirements.lighting.quantity) || 1;
-      lightingCost = Math.round((pricing.lighting[requirements.lighting.type] || 0) * lightingQuantity);
-      console.log('Lighting cost:', lightingCost);
+    let shedCost = 0;
+    let additionalCost = 0; // Initialize additionalCost
+
+    // Check if additionalFeatures exists and is an object (new format)
+    if (requirements.additionalFeatures && typeof requirements.additionalFeatures === 'object') {
+      // New format with additionalFeatures object
+      
+      // Drainage cost
+      if (requirements.additionalFeatures.drainage?.required) {
+        drainageCost = Math.round((pricing.additionalFeatures['drainage-system'] || 0) * courtArea);
+      }
+      
+      // Fencing cost
+      if (requirements.additionalFeatures.fencing?.required && requirements.additionalFeatures.fencing.type) {
+        const fencingLength = Number(requirements.additionalFeatures.fencing.length) || 0;
+        fencingCost = Math.round((pricing.additionalFeatures[requirements.additionalFeatures.fencing.type] || 0) * fencingLength);
+      }
+      
+      // Lighting cost
+      if (requirements.additionalFeatures.lighting?.required && requirements.additionalFeatures.lighting.type) {
+        const lightingQuantity = Number(requirements.additionalFeatures.lighting.quantity) || 1;
+        lightingCost = Math.round((pricing.additionalFeatures[requirements.additionalFeatures.lighting.type] || 0) * lightingQuantity);
+      }
+      
+      // Shed cost
+      if (requirements.additionalFeatures.shed?.required && requirements.additionalFeatures.shed.type) {
+        const shedArea = Number(requirements.additionalFeatures.shed.area) || courtArea;
+        shedCost = Math.round((pricing.additionalFeatures[requirements.additionalFeatures.shed.type] || 0) * shedArea);
+      }
+    } 
+    // Old format with separate lighting and roof
+    else {
+      // Old lighting cost
+      if (requirements.lighting && requirements.lighting.required && requirements.lighting.type) {
+        const lightingQuantity = Number(requirements.lighting.quantity) || 1;
+        lightingCost = Math.round((pricing.lighting[requirements.lighting.type] || 0) * lightingQuantity);
+      }
+
+      // Old roof cost (map to shed)
+      if (requirements.roof && requirements.roof.required && requirements.roof.type) {
+        const roofArea = Number(requirements.roof.area) || courtArea;
+        shedCost = Math.round((pricing.roof[requirements.roof.type] || 0) * roofArea);
+      }
+
+      // Additional features cost (old format - array)
+      if (Array.isArray(requirements.additionalFeatures)) {
+        additionalCost = requirements.additionalFeatures.reduce((total, feature) => {
+          return total + (Number(feature.cost) || 0);
+        }, 0);
+      }
     }
 
-    // Roof cost
-    let roofCost = 0;
-    if (requirements.roof && requirements.roof.required && requirements.roof.type) {
-      const roofArea = Number(requirements.roof.area) || courtArea;
-      roofCost = Math.round((pricing.roof[requirements.roof.type] || 0) * roofArea);
-      console.log('Roof cost:', roofCost);
-    }
-
-    // Additional features cost
-    const additionalCost = (requirements.additionalFeatures || []).reduce((total, feature) => {
-      return total + (Number(feature.cost) || 0);
-    }, 0);
-
-    const totalCost = baseCost + flooringCost + equipmentCost + lightingCost + roofCost + additionalCost;
+    const totalCost = baseCost + flooringCost + equipmentCost + drainageCost + fencingCost + lightingCost + shedCost + additionalCost;
 
     console.log('Final cost calculation:', {
       baseCost,
       flooringCost,
       equipmentCost,
+      drainageCost,
+      fencingCost,
       lightingCost,
-      roofCost,
+      shedCost,
       additionalCost,
       totalCost
     });
 
-    // FIX: Use courtType from either field
+    // Prepare quotation data for saving
     const quotationData = {
       clientInfo,
       projectInfo: {
-        sport: projectInfo.sport,
-        courtType: courtType, // Use the resolved courtType
-        courtSize: projectInfo.courtSize
+        // Use new field names but keep backward compatibility
+        constructionType: constructionType,
+        sport: sport,
+        courtSize: courtSize,
+        customArea: customArea,
+        // Keep old fields for backward compatibility
+        gameType: constructionType, // Map to old field
+        courtType: 'outdoor' // Default value
       },
       requirements: {
         base: { 
@@ -240,17 +231,23 @@ router.post('/', async (req, res) => {
           area: courtArea
         },
         equipment: requirements.equipment || [],
+        // New format
+        additionalFeatures: requirements.additionalFeatures || {},
+        // Old format for backward compatibility
         lighting: requirements.lighting || { required: false },
-        roof: requirements.roof || { required: false },
-        additionalFeatures: requirements.additionalFeatures || []
+        roof: requirements.roof || { required: false }
       },
       pricing: {
         baseCost,
         flooringCost,
         equipmentCost,
         lightingCost,
-        roofCost,
-        additionalCost,
+        roofCost: shedCost, // Map shed cost to roofCost for backward compatibility
+        additionalCost: drainageCost + fencingCost + additionalCost,
+        // New cost breakdown
+        drainageCost,
+        fencingCost,
+        shedCost,
         totalCost
       }
     };
@@ -274,6 +271,8 @@ router.post('/', async (req, res) => {
   }
 });
 
+
+
 // Test endpoint to check pricing data
 router.get('/debug/pricing', async (req, res) => {
   try {
@@ -286,7 +285,8 @@ router.get('/debug/pricing', async (req, res) => {
       base: pricing.base,
       flooring: pricing.flooring,
       courtSizes: pricing.courtSizes,
-      equipment: pricing.equipment
+      equipment: pricing.equipment,
+      additionalFeatures: pricing.additionalFeatures
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

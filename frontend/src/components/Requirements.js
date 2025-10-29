@@ -6,9 +6,12 @@ const Requirements = ({ data, updateData, nextStep, prevStep, projectInfo }) => 
     base: data.base || { type: '', area: '' },
     flooring: data.flooring || { type: '', area: '' },
     equipment: data.equipment || [],
-    lighting: data.lighting || { required: false, type: '', quantity: '' },
-    roof: data.roof || { required: false, type: '', area: '' },
-    additionalFeatures: data.additionalFeatures || []
+    additionalFeatures: data.additionalFeatures || {
+      drainage: { required: false, type: 'drainage-system', area: 0 },
+      fencing: { required: false, type: '', length: 0 },
+      lighting: { required: false, type: '', quantity: 1 },
+      shed: { required: false, type: '', area: 0 }
+    }
   });
   const [equipmentList, setEquipmentList] = useState([]);
   const [pricing, setPricing] = useState(null);
@@ -25,7 +28,7 @@ const Requirements = ({ data, updateData, nextStep, prevStep, projectInfo }) => 
         const equipmentData = equipmentRes.data;
         setEquipmentList(equipmentData);
         
-        // Auto-select equipment with proper initialization
+        // Auto-select equipment
         const initializedEquipment = equipmentData.map(item => ({
           ...item,
           quantity: Number(item.quantity) || 1,
@@ -79,57 +82,90 @@ const Requirements = ({ data, updateData, nextStep, prevStep, projectInfo }) => 
     }));
   };
 
+  const handleAdditionalFeatureChange = (feature, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      additionalFeatures: {
+        ...prev.additionalFeatures,
+        [feature]: {
+          ...prev.additionalFeatures[feature],
+          [field]: value
+        }
+      }
+    }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Validate form before proceeding
     if (!formData.base.type || !formData.flooring.type) {
       alert('Please select base and flooring types');
       return;
     }
 
-    // Ensure all equipment has valid quantities
-    const validatedEquipment = formData.equipment.map(item => ({
-      ...item,
-      quantity: Number(item.quantity) || 1,
-      totalCost: (Number(item.unitCost) || 0) * (Number(item.quantity) || 1)
-    }));
-
     const validatedFormData = {
       ...formData,
-      equipment: validatedEquipment,
-      lighting: {
-        ...formData.lighting,
-        quantity: formData.lighting.required ? (Number(formData.lighting.quantity) || 1) : 0
-      },
-      roof: {
-        ...formData.roof,
-        area: formData.roof.required ? (Number(formData.roof.area) || 0) : 0
-      }
+      equipment: formData.equipment.map(item => ({
+        ...item,
+        quantity: Number(item.quantity) || 1,
+        totalCost: (Number(item.unitCost) || 0) * (Number(item.quantity) || 1)
+      }))
     };
 
     updateData(validatedFormData);
     nextStep();
   };
 
-const getFlooringOptions = () => {
-  const outdoorOptions = [
-    { value: 'synthetic-turf', label: 'Synthetic Turf' },
-    { value: 'natural-grass', label: 'Natural Grass' },
-    { value: 'clay-court', label: 'Clay Court' },
-    { value: 'acrylic-surface', label: 'Acrylic Surface' },
-    { value: 'concrete-flooring', label: 'Concrete Flooring' }
-  ];
-  
-  const indoorOptions = [
-    { value: 'wooden-flooring', label: 'Wooden Flooring' },
-    { value: 'pvc-flooring', label: 'PVC Flooring' },
-    { value: 'rubber-flooring', label: 'Rubber Flooring' },
-    { value: 'concrete-flooring', label: 'Concrete Flooring' }
-  ];
-    
-  return projectInfo.courtType === 'indoor' ? indoorOptions : outdoorOptions; 
-};
+  const getFlooringOptions = () => {
+    const sportFlooring = {
+      'basketball': [
+        { value: 'acrylic-surface', label: 'Acrylic Surface' },
+        { value: 'concrete-flooring', label: 'Concrete Flooring' },
+        { value: 'polyurethane-track', label: 'Polyurethane' }
+      ],
+      'badminton': [
+        { value: 'wooden-flooring', label: 'Wooden Flooring' },
+        { value: 'pvc-flooring', label: 'PVC Flooring' },
+        { value: 'rubber-flooring', label: 'Rubber Flooring' }
+      ],
+      'boxcricket': [
+        { value: 'concrete-flooring', label: 'Concrete Flooring' },
+        { value: 'synthetic-turf', label: 'Synthetic Turf' }
+      ],
+      'football': [
+        { value: 'natural-grass', label: 'Natural Grass' },
+        { value: 'synthetic-turf', label: 'Synthetic Turf' }
+      ],
+      'gymflooring': [
+        { value: 'rubber-flooring', label: 'Rubber Flooring' },
+        { value: 'pvc-flooring', label: 'PVC Flooring' },
+        { value: 'wooden-flooring', label: 'Wooden Flooring' }
+      ],
+      'pickleball': [
+        { value: 'acrylic-surface', label: 'Acrylic Surface' },
+        { value: 'concrete-flooring', label: 'Concrete Flooring' }
+      ],
+      'running-track': [
+        { value: 'polyurethane-track', label: 'Polyurethane Track' },
+        { value: 'rubber-flooring', label: 'Rubber Flooring' }
+      ],
+      'tennis': [
+        { value: 'acrylic-surface', label: 'Acrylic Surface' },
+        { value: 'clay-court', label: 'Clay Court' },
+        { value: 'concrete-flooring', label: 'Concrete Flooring' }
+      ],
+      'volleyball': [
+        { value: 'acrylic-surface', label: 'Acrylic Surface' },
+        { value: 'wooden-flooring', label: 'Wooden Flooring' },
+        { value: 'concrete-flooring', label: 'Concrete Flooring' }
+      ]
+    };
+
+    return sportFlooring[projectInfo.sport] || [
+      { value: 'concrete-flooring', label: 'Concrete Flooring' },
+      { value: 'synthetic-turf', label: 'Synthetic Turf' }
+    ];
+  };
 
   const getBaseOptions = () => [
     { value: 'concrete-base', label: 'Concrete Base' },
@@ -137,26 +173,23 @@ const getFlooringOptions = () => {
     { value: 'compacted-soil', label: 'Compacted Soil' }
   ];
 
+  const getFencingOptions = () => [
+    { value: 'chain-link-fencing', label: 'Chain Link Fencing' },
+    { value: 'welded-mesh-fencing', label: 'Welded Mesh Fencing' },
+    { value: 'pvc-fencing', label: 'PVC Fencing' }
+  ];
+
   const getLightingOptions = () => [
     { value: 'led-floodlights', label: 'LED Floodlights' },
     { value: 'metal-halide', label: 'Metal Halide' },
-    { value: 'solar-lights', label: 'Solar Lights' },
-    { value: 'indoor-led', label: 'Indoor LED Lighting' }
+    { value: 'solar-lights', label: 'Solar Lights' }
   ];
 
-  const getRoofOptions = () => {
-    const options = [
-      { value: 'steel-shed', label: 'Steel Shed' },
-      { value: 'fabric-shed', label: 'Fabric Shed' },
-      { value: 'permanent-structure', label: 'Permanent Structure' }
-    ];
-    
-    if (projectInfo.sport === 'swimming') {
-      options.push({ value: 'swimming-pool-cover', label: 'Swimming Pool Cover' });
-    }
-    
-    return options;
-  };
+  const getShedOptions = () => [
+    { value: 'steel-shed', label: 'Steel Shed' },
+    { value: 'fabric-shed', label: 'Fabric Shed' },
+    { value: 'permanent-structure', label: 'Permanent Structure' }
+  ];
 
   return (
     <div className="form-container">
@@ -228,82 +261,156 @@ const getFlooringOptions = () => {
           ))}
         </div>
 
-        {/* Lighting Section */}
+        {/* Additional Features */}
         <div className="section">
-          <h3>4. Lighting (Optional)</h3>
-          <div className="form-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={formData.lighting.required}
-                onChange={(e) => handleChange('lighting', 'required', e.target.checked)}
-              />
-              Include Lighting System
-            </label>
-          </div>
-          {formData.lighting.required && (
-            <>
-              <div className="form-group">
-                <label>Lighting Type:</label>
-                <select
-                  value={formData.lighting.type}
-                  onChange={(e) => handleChange('lighting', 'type', e.target.value)}
-                  required={formData.lighting.required}
-                >
-                  <option value="">Select Lighting Type</option>
-                  {getLightingOptions().map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Quantity:</label>
-                <input
-                  type="number"
-                  value={formData.lighting.quantity}
-                  onChange={(e) => handleChange('lighting', 'quantity', e.target.value)}
-                  min="1"
-                  required={formData.lighting.required}
-                />
-              </div>
-            </>
-          )}
-        </div>
+          <h3>4. Additional Features</h3>
 
-        {/* Roof Section */}
-        <div className="section">
-          <h3>5. Roof/Cover (Optional)</h3>
-          <div className="form-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={formData.roof.required}
-                onChange={(e) => handleChange('roof', 'required', e.target.checked)}
-              />
-              Include Roof/Cover
-            </label>
+          {/* Drainage System */}
+          <div className="feature-section">
+            <h4>Drainage System</h4>
+            <div className="form-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.additionalFeatures.drainage.required}
+                  onChange={(e) => handleAdditionalFeatureChange('drainage', 'required', e.target.checked)}
+                />
+                Include Drainage System
+              </label>
+            </div>
           </div>
-          {formData.roof.required && (
-            <>
-              <div className="form-group">
-                <label>Roof Type:</label>
-                <select
-                  value={formData.roof.type}
-                  onChange={(e) => handleChange('roof', 'type', e.target.value)}
-                  required={formData.roof.required}
-                >
-                  <option value="">Select Roof Type</option>
-                  {getRoofOptions().map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
+
+          {/* Fencing */}
+          <div className="feature-section">
+            <h4>Fencing</h4>
+            <div className="form-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.additionalFeatures.fencing.required}
+                  onChange={(e) => handleAdditionalFeatureChange('fencing', 'required', e.target.checked)}
+                />
+                Include Fencing
+              </label>
+            </div>
+            {formData.additionalFeatures.fencing.required && (
+              <>
+                <div className="form-group">
+                  <label>Fencing Type:</label>
+                  <select
+                    value={formData.additionalFeatures.fencing.type}
+                    onChange={(e) => handleAdditionalFeatureChange('fencing', 'type', e.target.value)}
+                    required
+                  >
+                    <option value="">Select Fencing Type</option>
+                    {getFencingOptions().map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Fencing Length (meters):</label>
+                  <input
+                    type="number"
+                    value={formData.additionalFeatures.fencing.length}
+                    onChange={(e) => handleAdditionalFeatureChange('fencing', 'length', e.target.value)}
+                    min="1"
+                    required
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Lighting */}
+          <div className="feature-section">
+            <h4>Lighting</h4>
+            <div className="form-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.additionalFeatures.lighting.required}
+                  onChange={(e) => handleAdditionalFeatureChange('lighting', 'required', e.target.checked)}
+                />
+                Include Lighting System
+              </label>
+            </div>
+            {formData.additionalFeatures.lighting.required && (
+              <>
+                <div className="form-group">
+                  <label>Lighting Type:</label>
+                  <select
+                    value={formData.additionalFeatures.lighting.type}
+                    onChange={(e) => handleAdditionalFeatureChange('lighting', 'type', e.target.value)}
+                    required
+                  >
+                    <option value="">Select Lighting Type</option>
+                    {getLightingOptions().map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Number of Lights:</label>
+                  <input
+                    type="number"
+                    value={formData.additionalFeatures.lighting.quantity}
+                    onChange={(e) => handleAdditionalFeatureChange('lighting', 'quantity', e.target.value)}
+                    min="1"
+                    required
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Shed */}
+          <div className="feature-section">
+            <h4>Shed/Cover</h4>
+            <div className="form-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.additionalFeatures.shed.required}
+                  onChange={(e) => handleAdditionalFeatureChange('shed', 'required', e.target.checked)}
+                />
+                Include Shed/Cover
+              </label>
+            </div>
+            {formData.additionalFeatures.shed.required && (
+              <>
+                <div className="form-group">
+                  <label>Shed Type:</label>
+                  <select
+                    value={formData.additionalFeatures.shed.type}
+                    onChange={(e) => handleAdditionalFeatureChange('shed', 'type', e.target.value)}
+                    required
+                  >
+                    <option value="">Select Shed Type</option>
+                    {getShedOptions().map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Shed Area (sq. meters):</label>
+                  <input
+                    type="number"
+                    value={formData.additionalFeatures.shed.area}
+                    onChange={(e) => handleAdditionalFeatureChange('shed', 'area', e.target.value)}
+                    min="1"
+                    required
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="button-group">
