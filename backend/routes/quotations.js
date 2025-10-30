@@ -85,13 +85,13 @@ router.get('/equipment/:sport', async (req, res) => {
   }
 });
 
-// Create new quotation
-// Create new quotation
+// Create new quotation with dynamic pricing from database
 router.post('/', async (req, res) => {
   try {
     console.log('=== QUOTATION REQUEST START ===');
     console.log('Received quotation request body:', JSON.stringify(req.body, null, 2));
     
+    // Get pricing data from database
     const pricing = await Pricing.findOne({ category: 'default' });
     if (!pricing) {
       console.log('Pricing data not found');
@@ -100,36 +100,30 @@ router.post('/', async (req, res) => {
 
     const { clientInfo, projectInfo, requirements } = req.body;
     
-    // Enhanced validation for both old and new formats
+    // Enhanced validation
     if (!clientInfo || !clientInfo.name || !clientInfo.email || !clientInfo.phone || !clientInfo.address) {
       return res.status(400).json({ message: 'Please complete all client information fields' });
     }
 
-    // Handle both old and new projectInfo formats
-    const constructionType = projectInfo?.constructionType || 'standard';
-    const sport = projectInfo?.sport || projectInfo?.gameType;
-    const courtSize = projectInfo?.courtSize || 'standard';
-    const customArea = projectInfo?.customArea || 0;
-
-    if (!sport) {
+    if (!projectInfo?.sport) {
       return res.status(400).json({ message: 'Sport selection is required' });
     }
 
-    if (!requirements || !requirements.base || !requirements.flooring) {
+    if (!requirements?.base?.type || !requirements?.flooring?.type) {
       return res.status(400).json({ message: 'Please select base and flooring types' });
     }
 
     // Calculate court area based on construction type
     let courtArea;
-    if (constructionType === 'standard') {
-      courtArea = pricing.courtSizes[sport]?.standard || 100;
+    if (projectInfo.constructionType === 'standard') {
+      courtArea = pricing.courtSizes[projectInfo.sport]?.standard || 260;
     } else {
-      courtArea = customArea || 100;
+      courtArea = projectInfo.customArea || 260;
     }
 
-    console.log('Court area calculated:', courtArea, 'for sport:', sport, 'type:', constructionType);
+    console.log('Court area calculated:', courtArea, 'for sport:', projectInfo.sport, 'type:', projectInfo.constructionType);
 
-    // Calculate costs
+    // DYNAMIC PRICING CALCULATION BASED ON SELECTED REQUIREMENTS
     const baseCost = Math.round((pricing.base[requirements.base.type] || 0) * courtArea);
     const flooringCost = Math.round((pricing.flooring[requirements.flooring.type] || 0) * courtArea);
     
@@ -138,63 +132,38 @@ router.post('/', async (req, res) => {
       return total + (Number(item.totalCost) || 0);
     }, 0);
     
-    // Handle both old and new additional features format
+    // Additional features cost
     let drainageCost = 0;
     let fencingCost = 0;
     let lightingCost = 0;
     let shedCost = 0;
-    let additionalCost = 0; // Initialize additionalCost
 
-    // Check if additionalFeatures exists and is an object (new format)
-    if (requirements.additionalFeatures && typeof requirements.additionalFeatures === 'object') {
-      // New format with additionalFeatures object
-      
-      // Drainage cost
-      if (requirements.additionalFeatures.drainage?.required) {
-        drainageCost = Math.round((pricing.additionalFeatures['drainage-system'] || 0) * courtArea);
-      }
-      
-      // Fencing cost
-      if (requirements.additionalFeatures.fencing?.required && requirements.additionalFeatures.fencing.type) {
-        const fencingLength = Number(requirements.additionalFeatures.fencing.length) || 0;
-        fencingCost = Math.round((pricing.additionalFeatures[requirements.additionalFeatures.fencing.type] || 0) * fencingLength);
-      }
-      
-      // Lighting cost
-      if (requirements.additionalFeatures.lighting?.required && requirements.additionalFeatures.lighting.type) {
-        const lightingQuantity = Number(requirements.additionalFeatures.lighting.quantity) || 1;
-        lightingCost = Math.round((pricing.additionalFeatures[requirements.additionalFeatures.lighting.type] || 0) * lightingQuantity);
-      }
-      
-      // Shed cost
-      if (requirements.additionalFeatures.shed?.required && requirements.additionalFeatures.shed.type) {
-        const shedArea = Number(requirements.additionalFeatures.shed.area) || courtArea;
-        shedCost = Math.round((pricing.additionalFeatures[requirements.additionalFeatures.shed.type] || 0) * shedArea);
-      }
-    } 
-    // Old format with separate lighting and roof
-    else {
-      // Old lighting cost
-      if (requirements.lighting && requirements.lighting.required && requirements.lighting.type) {
-        const lightingQuantity = Number(requirements.lighting.quantity) || 1;
-        lightingCost = Math.round((pricing.lighting[requirements.lighting.type] || 0) * lightingQuantity);
-      }
-
-      // Old roof cost (map to shed)
-      if (requirements.roof && requirements.roof.required && requirements.roof.type) {
-        const roofArea = Number(requirements.roof.area) || courtArea;
-        shedCost = Math.round((pricing.roof[requirements.roof.type] || 0) * roofArea);
-      }
-
-      // Additional features cost (old format - array)
-      if (Array.isArray(requirements.additionalFeatures)) {
-        additionalCost = requirements.additionalFeatures.reduce((total, feature) => {
-          return total + (Number(feature.cost) || 0);
-        }, 0);
-      }
+    // Drainage cost
+    if (requirements.additionalFeatures?.drainage?.required) {
+      drainageCost = Math.round((pricing.additionalFeatures['drainage-system'] || 0) * courtArea);
+    }
+    
+    // Fencing cost
+    if (requirements.additionalFeatures?.fencing?.required && requirements.additionalFeatures.fencing.type) {
+      const fencingLength = Number(requirements.additionalFeatures.fencing.length) || 0;
+      fencingCost = Math.round((pricing.additionalFeatures[requirements.additionalFeatures.fencing.type] || 0) * fencingLength);
+    }
+    
+    // Lighting cost
+    if (requirements.additionalFeatures?.lighting?.required && requirements.additionalFeatures.lighting.type) {
+      const lightingQuantity = Number(requirements.additionalFeatures.lighting.quantity) || 1;
+      lightingCost = Math.round((pricing.additionalFeatures[requirements.additionalFeatures.lighting.type] || 0) * lightingQuantity);
+    }
+    
+    // Shed cost
+    if (requirements.additionalFeatures?.shed?.required && requirements.additionalFeatures.shed.type) {
+      const shedArea = Number(requirements.additionalFeatures.shed.area) || courtArea;
+      shedCost = Math.round((pricing.additionalFeatures[requirements.additionalFeatures.shed.type] || 0) * shedArea);
     }
 
-    const totalCost = baseCost + flooringCost + equipmentCost + drainageCost + fencingCost + lightingCost + shedCost + additionalCost;
+    const subtotal = baseCost + flooringCost + equipmentCost + drainageCost + fencingCost + lightingCost + shedCost;
+    const gstAmount = Math.round(subtotal * 0.18); // 18% GST
+    const grandTotal = subtotal + gstAmount;
 
     console.log('Final cost calculation:', {
       baseCost,
@@ -204,22 +173,19 @@ router.post('/', async (req, res) => {
       fencingCost,
       lightingCost,
       shedCost,
-      additionalCost,
-      totalCost
+      subtotal,
+      gstAmount,
+      grandTotal
     });
 
-    // Prepare quotation data for saving
+    // Prepare quotation data with dynamic pricing
     const quotationData = {
       clientInfo,
       projectInfo: {
-        // Use new field names but keep backward compatibility
-        constructionType: constructionType,
-        sport: sport,
-        courtSize: courtSize,
-        customArea: customArea,
-        // Keep old fields for backward compatibility
-        gameType: constructionType, // Map to old field
-        courtType: 'outdoor' // Default value
+        constructionType: projectInfo.constructionType || 'standard',
+        sport: projectInfo.sport,
+        courtSize: projectInfo.courtSize || 'standard',
+        customArea: projectInfo.customArea || 0
       },
       requirements: {
         base: { 
@@ -231,28 +197,25 @@ router.post('/', async (req, res) => {
           area: courtArea
         },
         equipment: requirements.equipment || [],
-        // New format
-        additionalFeatures: requirements.additionalFeatures || {},
-        // Old format for backward compatibility
-        lighting: requirements.lighting || { required: false },
-        roof: requirements.roof || { required: false }
+        additionalFeatures: requirements.additionalFeatures || {}
       },
+      // STORE DYNAMIC PRICING IN DATABASE
       pricing: {
         baseCost,
         flooringCost,
         equipmentCost,
-        lightingCost,
-        roofCost: shedCost, // Map shed cost to roofCost for backward compatibility
-        additionalCost: drainageCost + fencingCost + additionalCost,
-        // New cost breakdown
         drainageCost,
         fencingCost,
+        lightingCost,
         shedCost,
-        totalCost
+        subtotal,
+        gstAmount,
+        grandTotal,
+        area: courtArea
       }
     };
 
-    console.log('Creating quotation with data:', quotationData);
+    console.log('Creating quotation with dynamic pricing:', quotationData);
     const quotation = new Quotation(quotationData);
     await quotation.save();
     
@@ -270,8 +233,6 @@ router.post('/', async (req, res) => {
     });
   }
 });
-
-
 
 // Test endpoint to check pricing data
 router.get('/debug/pricing', async (req, res) => {

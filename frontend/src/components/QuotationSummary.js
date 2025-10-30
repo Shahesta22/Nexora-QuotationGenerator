@@ -12,62 +12,26 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
   const [quotation, setQuotation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pricingData, setPricingData] = useState(null);
 
-  // ✅ UNIFIED PRICING STRUCTURE - Matches PDF and Website
-  const UNIFIED_PRICING = {
-    baseConstruction: {
-      rate: 110, // per sq ft - matches PDF
-      description: 'Standard concrete base construction'
-    },
-    flooring: {
-      rate: 65, // per sq ft - matches PDF
-      description: 'Rubber floating flooring system'
-    },
-    equipment: {
-      cost: 55000, // Fixed cost for tennis equipment
-      description: 'Tennis net, posts, and equipment'
-    },
-    drainage: {
-      rate: 45, // per sq ft
-      description: 'Drainage system installation'
-    },
-    postNetSystem: {
-      cost: 30000, // Fixed cost - matches PDF
-      description: 'Post and net system'
-    },
-    gstRate: 0.18 // 18% GST
-  };
+  useEffect(() => {
+    // Fetch pricing data for display
+    const fetchPricing = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/pricing');
+        setPricingData(response.data);
+      } catch (error) {
+        console.error('Error fetching pricing data:', error);
+      }
+    };
+    fetchPricing();
+  }, []);
 
   const handleClientInfoChange = (e) => {
     setClientInfo({
       ...clientInfo,
       [e.target.name]: e.target.value
     });
-  };
-
-  // ✅ UNIFIED PRICING CALCULATION - Used across all components
-  const calculateUnifiedPricing = (area = 260) => {
-    const baseCost = area * UNIFIED_PRICING.baseConstruction.rate;
-    const flooringCost = area * UNIFIED_PRICING.flooring.rate;
-    const equipmentCost = UNIFIED_PRICING.equipment.cost;
-    const drainageCost = area * UNIFIED_PRICING.drainage.rate;
-    const postNetSystemCost = UNIFIED_PRICING.postNetSystem.cost;
-    
-    const subtotal = baseCost + flooringCost + equipmentCost + drainageCost + postNetSystemCost;
-    const gstAmount = Math.round(subtotal * UNIFIED_PRICING.gstRate);
-    const grandTotal = subtotal + gstAmount;
-
-    return {
-      baseCost,
-      flooringCost,
-      equipmentCost,
-      drainageCost,
-      postNetSystemCost,
-      subtotal,
-      gstAmount,
-      grandTotal,
-      area
-    };
   };
 
   const formatIndianRupees = (amount) => {
@@ -114,10 +78,7 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
     setError('');
     
     try {
-      // Calculate unified pricing
-      const unifiedPricing = calculateUnifiedPricing();
-      
-      // Prepare data with unified pricing
+      // Send the form data directly - backend will calculate pricing based on requirements
       const completeFormData = {
         clientInfo: {
           name: clientInfo.name.trim(),
@@ -127,44 +88,35 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
         },
         projectInfo: {
           sport: formData.projectInfo?.sport || '',
-          gameType: formData.projectInfo?.courtType || formData.projectInfo?.gameType || '',
-          courtSize: formData.projectInfo?.courtSize || ''
+          constructionType: formData.projectInfo?.constructionType || 'standard',
+          courtSize: formData.projectInfo?.courtSize || 'standard',
+          customArea: formData.projectInfo?.customArea || 0
         },
         requirements: {
           base: {
             type: formData.requirements?.base?.type || '',
-            area: 260
+            area: formData.requirements?.base?.area || 260
           },
           flooring: {
             type: formData.requirements?.flooring?.type || '',
-            area: 260
+            area: formData.requirements?.flooring?.area || 260
           },
           equipment: formData.requirements?.equipment || [],
-          lighting: formData.requirements?.lighting || { required: false },
-          roof: formData.requirements?.roof || { required: false },
-          additionalFeatures: formData.requirements?.additionalFeatures || []
-        },
-        // ✅ Include unified pricing in the request
-        unifiedPricing: unifiedPricing
+          additionalFeatures: formData.requirements?.additionalFeatures || {}
+        }
       };
 
-      console.log('Sending quotation with unified pricing:', completeFormData);
+      console.log('Sending quotation data for dynamic pricing:', completeFormData);
 
       const response = await axios.post('http://localhost:5000/api/quotations', completeFormData);
       const newQuotation = response.data;
       
-      // ✅ Ensure backend uses our unified pricing
-      const finalQuotation = {
-        ...newQuotation,
-        pricing: unifiedPricing // Override with our unified pricing
-      };
-      
-      setQuotation(finalQuotation);
+      setQuotation(newQuotation);
       updateData('clientInfo', clientInfo);
       
       // Automatically download PDF
       setTimeout(() => {
-        downloadPDF(finalQuotation);
+        downloadPDF(newQuotation);
       }, 1000);
       
     } catch (error) {
@@ -188,10 +140,10 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
       // Set margins and column positions
       const margin = 15;
       const pageWidth = 210;
-      const col1 = margin + 8; // Description
-      const col2 = margin + 115; // Qty
-      const col3 = margin + 132; // Price
-      const col4 = margin + 155; // Amount
+      const col1 = margin + 8;
+      const col2 = margin + 115;
+      const col3 = margin + 142;
+      const col4 = margin + 170;
       
       let yPosition = margin;
       
@@ -255,7 +207,7 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.text(`Ref. No: ${quotationData.quotationNumber || 'NXR000001'}`, margin, yPosition);
-      doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`, pageWidth - margin, yPosition, { align: 'right' });
+      doc.text(`Date: ${new Date(quotationData.createdAt).toLocaleDateString('en-IN')}`, pageWidth - margin, yPosition, { align: 'right' });
       
       // Client information
       yPosition += 12;
@@ -282,14 +234,15 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
       yPosition += 6;
       
       const sport = quotationData.projectInfo?.sport || 'Multi-Sport';
-      const courtType = quotationData.projectInfo?.courtType || quotationData.projectInfo?.gameType || 'Standard';
+      const constructionType = quotationData.projectInfo?.constructionType || 'Standard';
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Proposal for ${sport.replace(/-/g, ' ').toUpperCase()} ${courtType.toUpperCase()}`, margin, yPosition);
+      doc.text(`Proposal for ${sport.replace(/-/g, ' ').toUpperCase()} ${constructionType.toUpperCase()}`, margin, yPosition);
+      doc.text(`Area: ${quotationData.pricing.area} sq. meters`, margin, yPosition + 4);
       yPosition += 10;
 
-      // ✅ USE UNIFIED PRICING FOR PDF GENERATION
-      const unifiedPricing = calculateUnifiedPricing();
+      // ✅ USE DYNAMIC PRICING FROM DATABASE
+      const pricing = quotationData.pricing;
 
       // Cost Breakdown Table Header
       checkNewPage(10);
@@ -308,7 +261,7 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
       doc.line(margin, yPosition, pageWidth - margin, yPosition);
       yPosition += 6;
 
-      // Add items using unified pricing
+      // Add items dynamically based on selected requirements
       const addItem = (title, qty, price, descriptionLines) => {
         checkNewPage(20);
         
@@ -343,86 +296,115 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
         return amount;
       };
 
-      let totalAmount = 0;
+      // Base Construction
+      if (pricing.baseCost > 0) {
+        const unitPrice = Math.round(pricing.baseCost / pricing.area);
+        addItem(
+          `BASE CONSTRUCTION - ${quotationData.requirements?.base?.type || 'Standard'}`,
+          pricing.area,
+          unitPrice,
+          [
+            'Excavation work in surface excavation not exceeding 30cm depth.',
+            'Disposal of excavated earth up to 50m as directed.',
+            'Sub Grade preparation with power road roller 8-12 tonne.',
+            'WBM - Stone aggregate with 100mm thickness.',
+            'PCC flooring M-10 to M15 with 75mm thickness.'
+          ]
+        );
+      }
 
-      // Item 1: Base Construction
-      const baseAmount = addItem(
-        `BASE CONSTRUCTION - ${quotationData.requirements?.base?.type || 'Standard'}`,
-        unifiedPricing.area,
-        UNIFIED_PRICING.baseConstruction.rate,
-        [
-          'Excavation work in surface excavation not exceeding 30cm depth.',
-          'Disposal of excavated earth up to 50m as directed.',
-          'Sub Grade preparation with power road roller 8-12 tonne.',
-          'WBM - Stone aggregate with 100mm thickness.',
-          'PCC flooring M-10 to M15 with 75mm thickness.'
-        ]
-      );
-      totalAmount += baseAmount;
+      // Flooring System
+      if (pricing.flooringCost > 0) {
+        const unitPrice = Math.round(pricing.flooringCost / pricing.area);
+        addItem(
+          `FLOORING - ${quotationData.requirements?.flooring?.type || 'Standard'}`,
+          pricing.area,
+          unitPrice,
+          [
+            '8-Layer ITF approved acrylic system.',
+            'Layers: Primer, Resurfacer, Unirubber.',
+            'Precoat, Topcoat for protection.',
+            'High performance gameplay surface.',
+            'Make: UNICA/PRIOR/TOP FLOOR.'
+          ]
+        );
+      }
 
-      // Item 2: Flooring System
-      const flooringAmount = addItem(
-        `FLOORING - ${quotationData.requirements?.flooring?.type || 'Acrylic'}`,
-        unifiedPricing.area,
-        UNIFIED_PRICING.flooring.rate,
-        [
-          '8-Layer ITF approved acrylic system.',
-          'Layers: Primer, Resurfacer, Unirubber.',
-          'Precoat, Topcoat for protection.',
-          'High performance gameplay surface.',
-          'Make: UNICA/PRIOR/TOP FLOOR.'
-        ]
-      );
-      totalAmount += flooringAmount;
+      // Equipment
+      if (pricing.equipmentCost > 0) {
+        addItem(
+          'SPORTS EQUIPMENT',
+          1,
+          pricing.equipmentCost,
+          [
+            'High quality sports equipment.',
+            'Competition standard equipment.',
+            'Durable and weather resistant.'
+          ]
+        );
+      }
 
-      // Item 3: Equipment
-      const equipmentAmount = addItem(
-        'EQUIPMENT - Tennis Net & Posts',
-        1,
-        UNIFIED_PRICING.equipment.cost,
-        [
-          'High quality tennis equipment.',
-          'Competition standard equipment.',
-          'Durable and weather resistant.'
-        ]
-      );
-      totalAmount += equipmentAmount;
+      // Drainage System
+      if (pricing.drainageCost > 0) {
+        const unitPrice = Math.round(pricing.drainageCost / pricing.area);
+        addItem(
+          'DRAINAGE SYSTEM',
+          pricing.area,
+          unitPrice,
+          [
+            'PVC drainage pipes with slope design.',
+            'Surface and sub-surface drainage.',
+            'Prevents water logging.',
+            'Durable construction.'
+          ]
+        );
+      }
 
-      // Item 4: Drainage System
-      const drainageAmount = addItem(
-        'DRAINAGE SYSTEM',
-        unifiedPricing.area,
-        UNIFIED_PRICING.drainage.rate,
-        [
-          'PVC drainage pipes with slope design.',
-          'Surface and sub-surface drainage.',
-          'Prevents water logging.',
-          'Durable construction.'
-        ]
-      );
-      totalAmount += drainageAmount;
+      // Fencing
+      if (pricing.fencingCost > 0) {
+        addItem(
+          'FENCING SYSTEM',
+          1,
+          pricing.fencingCost,
+          [
+            `${sport.toUpperCase()} Standard Fencing.`,
+            'Galvanized steel construction.',
+            'Durable and secure.'
+          ]
+        );
+      }
 
-      // Item 5: Nets & Posts
-      const netAmount = addItem(
-        'POST & NET SYSTEM',
-        1,
-        UNIFIED_PRICING.postNetSystem.cost,
-        [
-          `${sport.toUpperCase()} Standard System.`,
-          'Adjustable height mechanism.',
-          'Galvanized steel posts.',
-          'Competition standard net.'
-        ]
-      );
-      totalAmount += netAmount;
+      // Lighting
+      if (pricing.lightingCost > 0) {
+        addItem(
+          'LIGHTING SYSTEM',
+          1,
+          pricing.lightingCost,
+          [
+            'Professional sports lighting.',
+            'Energy efficient LED system.',
+            'Competition standard illumination.'
+          ]
+        );
+      }
 
-      // Total Calculation - Should match website exactly
+      // Shed
+      if (pricing.shedCost > 0) {
+        addItem(
+          'SHED/COVER STRUCTURE',
+          1,
+          pricing.shedCost,
+          [
+            'Weather protection structure.',
+            'Durable construction materials.',
+            'Professional installation.'
+          ]
+        );
+      }
+
+      // Total Calculation
       checkNewPage(25);
       
-      const subtotal = totalAmount;
-      const gst = Math.round(subtotal * UNIFIED_PRICING.gstRate);
-      const grandTotal = subtotal + gst;
-
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       
@@ -430,18 +412,18 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
       yPosition += 6;
       
       doc.text('Total', col2, yPosition);
-      doc.text(subtotal.toLocaleString('en-IN') + '.00', col4, yPosition, { align: 'right' });
+      doc.text(pricing.subtotal.toLocaleString('en-IN') + '.00', col4, yPosition, { align: 'right' });
       
       yPosition += 7;
-      doc.text(`GST@${UNIFIED_PRICING.gstRate * 100}%`, col2, yPosition);
-      doc.text(gst.toLocaleString('en-IN') + '.00', col4, yPosition, { align: 'right' });
+      doc.text('GST@18%', col2, yPosition);
+      doc.text(pricing.gstAmount.toLocaleString('en-IN') + '.00', col4, yPosition, { align: 'right' });
       
       yPosition += 7;
       doc.line(col3, yPosition, col4 + 10, yPosition);
       yPosition += 7;
       
       doc.text('Grand Total', col2, yPosition);
-      doc.text(grandTotal.toLocaleString('en-IN') + '.00', col4, yPosition, { align: 'right' });
+      doc.text(pricing.grandTotal.toLocaleString('en-IN') + '.00', col4, yPosition, { align: 'right' });
       
       // Footer
       const addFooter = () => {
@@ -477,9 +459,6 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
   };
 
   if (quotation) {
-    // ✅ Use unified pricing for display
-    const pricing = calculateUnifiedPricing();
-
     return (
       <div className="quotation-container">
         <div className="company-letterhead">
@@ -489,7 +468,7 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
         
         <div className="success-message">
           <h2>✅ Quotation Generated Successfully!</h2>
-          <p>Your quotation has been generated with unified pricing across all platforms.</p>
+          <p>Your quotation has been generated with dynamic pricing based on your requirements.</p>
         </div>
         
         <div className="quotation-details">
@@ -509,41 +488,74 @@ const QuotationSummary = ({ formData, prevStep, updateData }) => {
             </div>
           </div>
 
-          {/* ✅ UNIFIED PRICE BREAKDOWN */}
+          {/* Project Details */}
+          <div className="section">
+            <h4>Project Details</h4>
+            <div className="info-grid">
+              <div><strong>Sport:</strong> {quotation.projectInfo?.sport || 'N/A'}</div>
+              <div><strong>Construction Type:</strong> {quotation.projectInfo?.constructionType || 'N/A'}</div>
+              <div><strong>Court Size:</strong> {quotation.projectInfo?.courtSize || 'N/A'}</div>
+              <div><strong>Area:</strong> {quotation.pricing.area} sq. meters</div>
+            </div>
+          </div>
+
+          {/* ✅ DYNAMIC PRICE BREAKDOWN FROM DATABASE */}
           <div className="section price-section">
-            <h4>Price Breakdown (Unified Across All Platforms)</h4>
+            <h4>Price Breakdown (Based on Your Requirements)</h4>
             <div className="price-breakdown">
-              <div className="price-row">
-                <span>Base Construction ({quotation.requirements?.base?.type || 'Standard'})</span>
-                <span>{formatIndianRupees(pricing.baseCost)}</span>
-              </div>
-              <div className="price-row">
-                <span>Flooring ({quotation.requirements?.flooring?.type || 'Standard'})</span>
-                <span>{formatIndianRupees(pricing.flooringCost)}</span>
-              </div>
-              <div className="price-row">
-                <span>Equipment</span>
-                <span>{formatIndianRupees(pricing.equipmentCost)}</span>
-              </div>
-              <div className="price-row">
-                <span>Drainage System</span>
-                <span>{formatIndianRupees(pricing.drainageCost)}</span>
-              </div>
-              <div className="price-row">
-                <span>Post & Net System</span>
-                <span>{formatIndianRupees(pricing.postNetSystemCost)}</span>
-              </div>
+              {quotation.pricing.baseCost > 0 && (
+                <div className="price-row">
+                  <span>Base Construction ({quotation.requirements?.base?.type || 'Standard'})</span>
+                  <span>{formatIndianRupees(quotation.pricing.baseCost)}</span>
+                </div>
+              )}
+              {quotation.pricing.flooringCost > 0 && (
+                <div className="price-row">
+                  <span>Flooring ({quotation.requirements?.flooring?.type || 'Standard'})</span>
+                  <span>{formatIndianRupees(quotation.pricing.flooringCost)}</span>
+                </div>
+              )}
+              {quotation.pricing.equipmentCost > 0 && (
+                <div className="price-row">
+                  <span>Sports Equipment</span>
+                  <span>{formatIndianRupees(quotation.pricing.equipmentCost)}</span>
+                </div>
+              )}
+              {quotation.pricing.drainageCost > 0 && (
+                <div className="price-row">
+                  <span>Drainage System</span>
+                  <span>{formatIndianRupees(quotation.pricing.drainageCost)}</span>
+                </div>
+              )}
+              {quotation.pricing.fencingCost > 0 && (
+                <div className="price-row">
+                  <span>Fencing System</span>
+                  <span>{formatIndianRupees(quotation.pricing.fencingCost)}</span>
+                </div>
+              )}
+              {quotation.pricing.lightingCost > 0 && (
+                <div className="price-row">
+                  <span>Lighting System</span>
+                  <span>{formatIndianRupees(quotation.pricing.lightingCost)}</span>
+                </div>
+              )}
+              {quotation.pricing.shedCost > 0 && (
+                <div className="price-row">
+                  <span>Shed/Cover Structure</span>
+                  <span>{formatIndianRupees(quotation.pricing.shedCost)}</span>
+                </div>
+              )}
               <div className="price-row subtotal">
                 <span><strong>Subtotal</strong></span>
-                <span><strong>{formatIndianRupees(pricing.subtotal)}</strong></span>
+                <span><strong>{formatIndianRupees(quotation.pricing.subtotal)}</strong></span>
               </div>
               <div className="price-row">
                 <span>GST (18%)</span>
-                <span>{formatIndianRupees(pricing.gstAmount)}</span>
+                <span>{formatIndianRupees(quotation.pricing.gstAmount)}</span>
               </div>
               <div className="price-row grand-total">
                 <span><strong>Grand Total</strong></span>
-                <span><strong>{formatIndianRupees(pricing.grandTotal)}</strong></span>
+                <span><strong>{formatIndianRupees(quotation.pricing.grandTotal)}</strong></span>
               </div>
             </div>
           </div>

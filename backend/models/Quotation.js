@@ -8,14 +8,10 @@ const quotationSchema = new mongoose.Schema({
     address: { type: String, required: true }
   },
   projectInfo: {
-    // New fields
     constructionType: { type: String, required: true },
     sport: { type: String, required: true },
     customArea: { type: Number, default: 0 },
-    // Old fields for backward compatibility
-    gameType: { type: String },
-    courtType: { type: String },
-    courtSize: { type: String }
+    courtSize: { type: String, default: 'standard' }
   },
   requirements: {
     base: {
@@ -32,7 +28,6 @@ const quotationSchema = new mongoose.Schema({
       unitCost: Number,
       totalCost: Number
     }],
-    // New additional features structure
     additionalFeatures: {
       drainage: {
         required: { type: Boolean, default: false },
@@ -54,32 +49,21 @@ const quotationSchema = new mongoose.Schema({
         type: { type: String },
         area: { type: Number }
       }
-    },
-    // Old structure for backward compatibility
-    lighting: {
-      required: { type: Boolean, default: false },
-      type: { type: String },
-      quantity: { type: Number }
-    },
-    roof: {
-      required: { type: Boolean, default: false },
-      type: { type: String },
-      area: { type: Number }
     }
   },
+  // UNIFIED PRICING STRUCTURE
   pricing: {
     baseCost: { type: Number, required: true },
     flooringCost: { type: Number, required: true },
     equipmentCost: { type: Number, default: 0 },
-    // New costs
     drainageCost: { type: Number, default: 0 },
     fencingCost: { type: Number, default: 0 },
-    shedCost: { type: Number, default: 0 },
-    // Old costs for backward compatibility
     lightingCost: { type: Number, default: 0 },
-    roofCost: { type: Number, default: 0 },
-    additionalCost: { type: Number, default: 0 },
-    totalCost: { type: Number, required: true }
+    shedCost: { type: Number, default: 0 },
+    subtotal: { type: Number, required: true },
+    gstAmount: { type: Number, required: true },
+    grandTotal: { type: Number, required: true },
+    area: { type: Number, required: true }
   },
   quotationNumber: { type: String, unique: true },
   createdAt: { type: Date, default: Date.now },
